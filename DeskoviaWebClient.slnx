@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="DeskoviaWebClient.Client/DeskoviaWebClient.Client.csproj" />
+  <Project Path="DeskoviaWebClient/DeskoviaWebClient.csproj" />
+</Solution>
