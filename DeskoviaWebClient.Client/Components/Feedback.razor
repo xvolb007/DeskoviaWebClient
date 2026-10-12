@@ -1,0 +1,8 @@
+﻿@if (Busy) { <p role="status" class="status">Loading…</p> }
+@if (!string.IsNullOrEmpty(Error)) { <p role="alert" class="error">@Error</p> }
+@if (!string.IsNullOrEmpty(Notice)) { <p role="status" class="success">@Notice</p> }
+@code {
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public string? Error { get; set; }
+    [Parameter] public string? Notice { get; set; }
+}

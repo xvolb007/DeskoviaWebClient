@@ -1,0 +1,72 @@
+﻿@page "/reservations"
+@page "/admin/history"
+@inherits WorkspacePage
+@inject NavigationManager Navigation
+
+<PageTitle>Reservations — Deskovia</PageTitle>
+<h1>@(AdminHistory ? "ABC reservation history" : "My reservations")</h1>
+<Feedback Busy="Busy" Error="@Error" Notice="@Notice" />
+<fieldset disabled="@Busy">
+    <div class="toolbar">
+        @if (!AdminHistory) { <label><input type="checkbox" @bind="history" @bind:after="Reset" /> Completed and cancelled</label> }
+        else
+        {
+            <label>Office <select @bind="officeId" @bind:after="Reset"><option value="">All</option>@foreach (var o in offices) { <option value="@o.Id">@o.Name</option> }</select></label>
+            <label>Member <select @bind="memberId" @bind:after="Reset"><option value="">All</option>@foreach (var m in members) { <option value="@m.Id">@m.Name</option> }</select></label>
+            <label>Status <select @bind="status" @bind:after="Reset"><option value="">All</option>@foreach (var s in new[] { "Reserved", "Confirmed", "Completed", "Cancelled" }) { <option>@s</option> }</select></label>
+            <label>Cancellation reason <input @bind="reason" maxlength="1000" placeholder="Required when cancelling another member's reservation" /></label>
+        }
+        <button @onclick="Refresh">Refresh</button>
+    </div>
+    @if (items.Total == 0 && !Busy) { <p>No reservations found.</p> }
+    @foreach (var r in items.Items)
+    {
+        <article class="panel reservation">
+            <h2>@r.Office / @r.Room / @r.Desk</h2>
+            <p>@Local(r.Start, r.TimeZoneId) — @Local(r.End, r.TimeZoneId) · @r.TimeZoneId</p>
+            <p>@r.Member · @r.Status @r.CancellationReason</p>
+            @if (r.CompletedAt != null) { <p>Released: @Local(r.CompletedAt.Value, r.TimeZoneId)</p> }
+            @if (r.CanConfirm) { <button class="primary" @onclick='() => Change(r.Id, "confirm")'>Confirm arrival</button> }
+            @if (r.CanComplete) { <button @onclick='() => Change(r.Id, "complete")'>Complete</button> }
+            @if (r.CanCancel || AdminHistory && r.Status is "Reserved" or "Confirmed") { <button @onclick='() => Change(r.Id, "cancel")'>Cancel</button> }
+            @if (r.Status == "Reserved") { <small>Confirmation: @Local(r.Start.AddHours(-1), r.TimeZoneId) — until @Local(r.Start.AddMinutes(5), r.TimeZoneId).</small> }
+        </article>
+    }
+    <div class="toolbar"><button disabled="@(page <= 1)" @onclick="Previous">Previous</button><span>Page @(page) · total @items.Total</span><button disabled="@(page * 20 >= items.Total)" @onclick="Next">Next</button></div>
+</fieldset>
+@code {
+    [SupplyParameterFromQuery] public Guid? Id { get; set; }
+    private bool AdminHistory => Navigation.ToBaseRelativePath(Navigation.Uri).StartsWith("admin");
+    private bool history;
+    private int page = 1;
+    private string officeId = "", memberId = "", status = "", reason = "";
+    private PageResult<ReservationView> items = new([], 0, 1, 20);
+    private List<OfficeView> offices = [];
+    private List<MemberView> members = [];
+    protected override Task OnInitializedAsync() => Run(async () =>
+    {
+        if (!await Api.Ensure()) return;
+        if (AdminHistory) { offices = await Api.Get<List<OfficeView>>("api/offices?archived=true"); members = await Api.Get<List<MemberView>>("api/admin/members"); }
+        await Load();
+    });
+    private async Task Load()
+    {
+        if (Id != null && !AdminHistory)
+        {
+            var r = await Api.Get<ReservationView>($"api/reservations/{Id}"); items = new([r], 1, 1, 20); return;
+        }
+        var path = AdminHistory ? $"api/admin/reservations?page={page}&status={status}" + (officeId == "" ? "" : $"&officeId={officeId}") + (memberId == "" ? "" : $"&memberId={memberId}") :
+            $"api/reservations/mine?page={page}&history={history}";
+        items = await Api.Get<PageResult<ReservationView>>(path);
+    }
+    private Task Refresh() => Run(Load);
+    private Task Reset() { page = 1; Id = null; return Refresh(); }
+    private Task Previous() { page--; return Refresh(); }
+    private Task Next() { page++; return Refresh(); }
+    private Task Change(Guid id, string action) => Run(async () =>
+    {
+        try { await Api.Action($"api/reservations/{id}/{action}", action == "cancel" ? new ReasonRequest(reason) : null); Notice = "Action completed."; }
+        catch (ApiException e) when (e.Status == 409) { await Load(); throw; }
+        await Load();
+    });
+}

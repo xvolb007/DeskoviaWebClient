@@ -1,4 +1,4 @@
-using DeskoviaWebClient.Client.Pages;
+﻿using DeskoviaWebClient.Client.Pages;
 using DeskoviaWebClient.Components;
 
 var builder = WebApplication.CreateBuilder(args);

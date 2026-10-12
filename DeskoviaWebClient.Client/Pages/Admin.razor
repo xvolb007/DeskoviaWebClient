@@ -1,0 +1,273 @@
+﻿@page "/admin"
+@inherits WorkspacePage
+
+<PageTitle>Office management — Deskovia</PageTitle>
+<h1>Offices and layout editor</h1>
+<Feedback Busy="Busy" Error="@Error" Notice="@Notice" />
+@if (Api.Admin)
+{
+    <fieldset disabled="@Busy">
+        <div class="toolbar">
+            <label>Office <select @bind="officeId" @bind:after="SelectOffice"><option value="">New office</option>@foreach (var o in offices) { <option value="@o.Id">@o.Name @(o.IsArchived ? "(archived)" : "")</option> }</select></label>
+            <button @onclick="NewOffice">New office</button>
+            @if (officeId != "") { <button @onclick='() => Archive("offices", Guid.Parse(officeId))'>Archive office and resolve reservations</button> }
+        </div>
+        <section class="panel">
+            <h2>Office settings</h2>
+            <label>Name <input @bind="officeName" maxlength="200" /></label>
+            <label>Time zone <input @bind="zone" placeholder="Europe/Prague" /></label>
+            <label>Booking horizon (days) <input type="number" min="1" max="365" @bind="horizon" /></label>
+            <h3>Working hours</h3>
+            @foreach (var d in days)
+            {
+                <div class="toolbar"><label><input type="checkbox" @bind="d.Open" /> @d.Day</label><input aria-label="Opening time" type="time" step="900" @bind="d.From" /><input aria-label="Closing time" type="time" step="900" @bind="d.Until" /></div>
+            }
+            <button class="primary" @onclick="SaveOffice">Save office</button>
+        </section>
+        @if (officeId != "")
+        {
+            <div class="layout-editor">
+                <div class="editor-row">
+                    <section class="panel editor-form" aria-labelledby="room-editor-heading">
+                        <div class="editor-heading">
+                            <h2 id="room-editor-heading">Room</h2>
+                            <span class="draft-badge">@(roomId == "" ? "New" : "Edit")</span>
+                        </div>
+                        <label class="editor-field" for="room-selection">
+                            <span>Select</span>
+                            <select id="room-selection" @bind="roomId" @bind:after="SelectRoom">
+                                <option value="">New room</option>
+                                @foreach (var r in map.Rooms)
+                                {
+                                    <option value="@r.Id">@r.Name @(r.IsArchived ? "(archived)" : "")</option>
+                                }
+                            </select>
+                        </label>
+                        <label class="editor-field" for="room-name">
+                            <span>Name</span>
+                            <input id="room-name" @bind="roomName" @bind:event="oninput" maxlength="200" placeholder="Room name" />
+                        </label>
+                        <SliderField Id="room-x" Label="Office X" @bind-Value="roomX" Min="0" Max="10000" />
+                        <SliderField Id="room-y" Label="Office Y" @bind-Value="roomY" Min="0" Max="10000" />
+                        <SliderField Id="room-width" Label="Width" @bind-Value="width" Min="20" Max="10000" />
+                        <SliderField Id="room-height" Label="Height" @bind-Value="height" Min="20" Max="10000" />
+                        <div class="editor-actions">
+                            <button class="primary" @onclick="SaveRoom">Save room</button>
+                            @if (roomId != "") { <button @onclick='() => Archive("rooms", Guid.Parse(roomId))'>Archive room</button> }
+                        </div>
+                    </section>
+                    <section class="panel editor-preview" aria-labelledby="office-preview-heading">
+                        <div class="preview-heading">
+                            <h2 id="office-preview-heading">Office layout</h2>
+                            <span class="preview-badge">Live preview</span>
+                        </div>
+                        <div class="preview-summary">
+                            <strong>@(string.IsNullOrWhiteSpace(roomName) ? "New room" : roomName)</strong>
+                            <span>X @Number(roomX) · Y @Number(roomY) · @Number(width) × @Number(height)</span>
+                        </div>
+                        <div class="preview-frame">
+                            <svg class="layout-canvas" viewBox="@OfficeViewBox" role="group" aria-label="Office layout with the current room draft">
+                                <defs>
+                                    <pattern id="office-editor-grid" width="20" height="20" patternUnits="userSpaceOnUse">
+                                        <path d="M 20 0 L 0 0 0 20" class="canvas-grid" />
+                                    </pattern>
+                                </defs>
+                                <rect x="@Number(OfficeLeft)" y="@Number(OfficeTop)" width="@Number(OfficeWidth)" height="@Number(OfficeHeight)" fill="url(#office-editor-grid)" />
+                                @foreach (var r in map.Rooms.Where(x => !x.IsArchived && x.Id.ToString() != roomId))
+                                {
+                                    <g class="saved-room canvas-choice" role="button" tabindex="0" aria-label="@($"Edit room {r.Name}")" aria-disabled="@Busy"
+                                       @onclick="() => PickRoom(r.Id)" @onkeydown="e => HandleRoomKey(r.Id, e)">
+                                        <title>@r.Name · X @Number(r.X), Y @Number(r.Y) · @Number(r.Width) × @Number(r.Height)</title>
+                                        <rect x="@Number(r.X)" y="@Number(r.Y)" width="@Number(r.Width)" height="@Number(r.Height)" />
+                                        <text x="@Number(r.X + 5)" y="@Number(r.Y + OfficeTextSize + 3)" font-size="@Number(OfficeTextSize)">@r.Name</text>
+                                    </g>
+                                }
+                                <g class="coordinate-guides" aria-hidden="true">
+                                    <line x1="0" y1="@Number(roomY)" x2="@Number(roomX)" y2="@Number(roomY)" />
+                                    <line x1="@Number(roomX)" y1="0" x2="@Number(roomX)" y2="@Number(roomY)" />
+                                    <circle cx="0" cy="0" r="@Number(OfficeTextSize / 4)" />
+                                    <text x="@Number(OfficeTextSize / 2)" y="@Number(-OfficeTextSize / 2)" font-size="@Number(OfficeTextSize)">0, 0</text>
+                                </g>
+                                <g class="draft-room">
+                                    <title>Room draft · X @Number(roomX), Y @Number(roomY) · @Number(width) × @Number(height)</title>
+                                    <rect x="@Number(roomX)" y="@Number(roomY)" width="@Number(PreviewWidth)" height="@Number(PreviewHeight)" />
+                                    <text x="@Number(roomX + 5)" y="@Number(roomY + OfficeTextSize + 3)" font-size="@Number(OfficeTextSize)">@(string.IsNullOrWhiteSpace(roomName) ? "New room" : roomName)</text>
+                                    <circle cx="@Number(roomX)" cy="@Number(roomY)" r="@Number(OfficeTextSize / 3)" />
+                                </g>
+                            </svg>
+                        </div>
+                        <p class="preview-help">The highlighted room follows your values immediately. X and Y locate its top-left corner from the office origin. Click another room to edit it. Save to apply changes.</p>
+                    </section>
+                </div>
+                @if (roomId != "")
+                {
+                    <div class="editor-row">
+                        <section class="panel editor-form" aria-labelledby="desk-editor-heading">
+                            <div class="editor-heading">
+                                <h2 id="desk-editor-heading">Desk</h2>
+                                <span class="draft-badge">@(deskId == "" ? "New" : "Edit")</span>
+                            </div>
+                            <label class="editor-field" for="desk-selection">
+                                <span>Select</span>
+                                <select id="desk-selection" @bind="deskId" @bind:after="SelectDesk">
+                                    <option value="">New desk</option>
+                                    @foreach (var d in map.Desks.Where(x => x.RoomId.ToString() == roomId))
+                                    {
+                                        <option value="@d.Id">@d.Label @(d.IsArchived ? "(archived)" : "")</option>
+                                    }
+                                </select>
+                            </label>
+                            <label class="editor-field" for="desk-label">
+                                <span>Label</span>
+                                <input id="desk-label" @bind="label" @bind:event="oninput" maxlength="100" placeholder="Desk label" />
+                            </label>
+                            <SliderField Id="desk-x" Label="Room X" @bind-Value="deskX" Min="0" Max="@Math.Max(width - 12, 0)" />
+                            <SliderField Id="desk-y" Label="Room Y" @bind-Value="deskY" Min="0" Max="@Math.Max(height - 12, 0)" />
+                            <SliderField Id="desk-rotation" Label="Rotation" @bind-Value="rotation" Min="0" Max="359" />
+                            <div class="editor-actions">
+                                <button class="primary" @onclick="SaveDesk">Save desk</button>
+                                @if (deskId != "") { <button @onclick='() => Archive("desks", Guid.Parse(deskId))'>Archive desk</button> }
+                            </div>
+                        </section>
+                        <section class="panel editor-preview" aria-labelledby="room-preview-heading">
+                            <div class="preview-heading">
+                                <h2 id="room-preview-heading">@roomName · desk layout</h2>
+                                <span class="preview-badge">Live preview</span>
+                            </div>
+                            <div class="preview-summary">
+                                <strong>@(string.IsNullOrWhiteSpace(label) ? "New desk" : label)</strong>
+                                <span>X @Number(deskX) · Y @Number(deskY) · @Number(rotation)°</span>
+                            </div>
+                            <div class="preview-frame">
+                                <svg class="layout-canvas" viewBox="@RoomViewBox" role="group" aria-label="Room layout with the current desk draft">
+                                    <defs>
+                                        <pattern id="room-editor-grid" width="10" height="10" patternUnits="userSpaceOnUse">
+                                            <path d="M 10 0 L 0 0 0 10" class="canvas-grid" />
+                                        </pattern>
+                                    </defs>
+                                    <rect class="room-boundary" x="0" y="0" width="@Number(PreviewWidth)" height="@Number(PreviewHeight)" fill="url(#room-editor-grid)" />
+                                    @foreach (var d in map.Desks.Where(x => x.RoomId.ToString() == roomId && !x.IsArchived && x.Id.ToString() != deskId))
+                                    {
+                                        <g class="saved-desk canvas-choice" role="button" tabindex="0" aria-label="@($"Edit desk {d.Label}")" aria-disabled="@Busy"
+                                           transform="@DeskTransform(d.X, d.Y, d.Rotation)" @onclick="() => PickDesk(d.Id)" @onkeydown="e => HandleDeskKey(d.Id, e)">
+                                            <title>@d.Label · X @Number(d.X), Y @Number(d.Y) · @Number(d.Rotation)°</title>
+                                            <rect x="@Number(d.X)" y="@Number(d.Y)" width="12" height="12" rx="2" />
+                                            <text x="@Number(d.X + 6)" y="@Number(d.Y + 6)" font-size="2.4" text-anchor="middle" dominant-baseline="middle">@d.Label</text>
+                                        </g>
+                                    }
+                                    <g class="coordinate-guides" aria-hidden="true">
+                                        <line x1="0" y1="@Number(deskY)" x2="@Number(deskX)" y2="@Number(deskY)" />
+                                        <line x1="@Number(deskX)" y1="0" x2="@Number(deskX)" y2="@Number(deskY)" />
+                                    </g>
+                                    <g class="draft-desk" transform="@DeskTransform(deskX, deskY, rotation)">
+                                        <title>Desk draft · X @Number(deskX), Y @Number(deskY) · @Number(rotation)°</title>
+                                        <rect x="@Number(deskX)" y="@Number(deskY)" width="12" height="12" rx="2" />
+                                        <text x="@Number(deskX + 6)" y="@Number(deskY + 6)" font-size="2.4" text-anchor="middle" dominant-baseline="middle">@(string.IsNullOrWhiteSpace(label) ? "New" : label)</text>
+                                    </g>
+                                </svg>
+                            </div>
+                            <p class="preview-help">Desk coordinates start at the room's top-left corner. Edit a number or its slider to preview the position and rotation. Save room dimensions before saving a desk.</p>
+                        </section>
+                    </div>
+                }
+                else
+                {
+                    <p class="preview-help">Save the room to start adding desks.</p>
+                }
+            </div>
+        }
+    </fieldset>
+}
+@code {
+    private List<OfficeView> offices = [];
+    private OfficeMap map = new([], []);
+    private string officeId = "", roomId = "", deskId = "", officeName = "", zone = "Europe/Prague", roomName = "", label = "";
+    private int horizon = 30;
+    private decimal roomX, roomY, width = 100, height = 100, deskX, deskY, rotation;
+    private List<DayEditor> days = [];
+    private decimal PreviewWidth => Math.Max(width, 1);
+    private decimal PreviewHeight => Math.Max(height, 1);
+    private decimal OfficeLeft => Math.Min(0, roomX) - 24;
+    private decimal OfficeTop => Math.Min(0, roomY) - 24;
+    private decimal OfficeRight => Math.Max(320, Math.Max(roomX + PreviewWidth,
+        map.Rooms.Where(x => !x.IsArchived && x.Id.ToString() != roomId).Select(x => x.X + x.Width).DefaultIfEmpty(0).Max()));
+    private decimal OfficeBottom => Math.Max(220, Math.Max(roomY + PreviewHeight,
+        map.Rooms.Where(x => !x.IsArchived && x.Id.ToString() != roomId).Select(x => x.Y + x.Height).DefaultIfEmpty(0).Max()));
+    private decimal OfficeWidth => OfficeRight - OfficeLeft + 24;
+    private decimal OfficeHeight => OfficeBottom - OfficeTop + 24;
+    private decimal OfficeTextSize => Math.Max(OfficeWidth / 65, OfficeHeight / 40);
+    private string OfficeViewBox => $"{Number(OfficeLeft)} {Number(OfficeTop)} {Number(OfficeWidth)} {Number(OfficeHeight)}";
+    private decimal RoomPadding => Math.Max(PreviewWidth, PreviewHeight) * .06m;
+    private string RoomViewBox => $"{Number(-RoomPadding)} {Number(-RoomPadding)} {Number(PreviewWidth + RoomPadding * 2)} {Number(PreviewHeight + RoomPadding * 2)}";
+    private static string DeskTransform(decimal x, decimal y, decimal angle) => $"rotate({Number(angle)} {Number(x + 6)} {Number(y + 6)})";
+    private void HandleRoomKey(Guid id, KeyboardEventArgs e)
+    {
+        if (e.Key is "Enter" or " ") PickRoom(id);
+    }
+    private void HandleDeskKey(Guid id, KeyboardEventArgs e)
+    {
+        if (e.Key is "Enter" or " ") PickDesk(id);
+    }
+    private sealed class DayEditor { public DayOfWeek Day; public bool Open; public TimeOnly From = new(7, 0); public TimeOnly Until = new(18, 0); }
+    protected override Task OnInitializedAsync() => Run(async () => { if (await Api.Ensure()) { if (!Api.Admin) { Error = "You do not have permission to perform this action."; return; } await Reload(); ResetOffice(); } });
+    protected override async Task OnConflict()
+    {
+        await Reload();
+        if (officeId != "") map = await Api.Get<OfficeMap>($"api/offices/{officeId}/map?archived=true");
+    }
+    private async Task Reload() => offices = await Api.Get<List<OfficeView>>("api/offices?archived=true");
+    private void ResetOffice()
+    {
+        officeName = ""; zone = "Europe/Prague"; horizon = 30; map = new([], []); roomId = deskId = "";
+        days = Enum.GetValues<DayOfWeek>().Select(x => new DayEditor { Day = x, Open = x is not (DayOfWeek.Saturday or DayOfWeek.Sunday) }).ToList();
+    }
+    private void NewOffice() { officeId = ""; ResetOffice(); }
+    private Task SelectOffice() => Run(LoadOffice);
+    private async Task LoadOffice()
+    {
+        if (officeId == "") { ResetOffice(); return; }
+        var o = offices.Single(x => x.Id.ToString() == officeId);
+        officeName = o.Name; zone = o.TimeZoneId; horizon = o.BookingHorizonDays;
+        days = Enum.GetValues<DayOfWeek>().Select(x =>
+        {
+            var h = o.Hours.SingleOrDefault(h => h.Day == x);
+            return new DayEditor { Day = x, Open = h != null, From = h?.OpensAt ?? new(7, 0), Until = h?.ClosesAt ?? new(18, 0) };
+        }).ToList();
+        map = await Api.Get<OfficeMap>($"api/offices/{officeId}/map?archived=true"); roomId = deskId = ""; SelectRoom();
+    }
+    private void SelectRoom()
+    {
+        var r = map.Rooms.FirstOrDefault(x => x.Id.ToString() == roomId);
+        roomName = r?.Name ?? ""; roomX = r?.X ?? 0; roomY = r?.Y ?? 0; width = r?.Width ?? 100; height = r?.Height ?? 100;
+        deskId = ""; SelectDesk();
+    }
+    private void SelectDesk()
+    {
+        var d = map.Desks.FirstOrDefault(x => x.Id.ToString() == deskId);
+        label = d?.Label ?? ""; deskX = d?.X ?? 0; deskY = d?.Y ?? 0; rotation = d?.Rotation ?? 0;
+    }
+    private void PickRoom(Guid id) { if (Busy) return; roomId = id.ToString(); SelectRoom(); }
+    private void PickDesk(Guid id) { if (Busy) return; deskId = id.ToString(); SelectDesk(); }
+    private Task SaveOffice() => Run(async () =>
+    {
+        var input = new OfficeInput(officeName, zone, horizon, days.Where(x => x.Open).Select(x => new WorkingHoursInput(x.Day, x.From, x.Until)).ToList());
+        var id = officeId == "" ? await Api.Post<Guid>("api/admin/offices", input) : await Api.Put<Guid>($"api/admin/offices/{officeId}", input);
+        officeId = id.ToString(); await Reload(); await LoadOffice(); Notice = "Office saved.";
+    });
+    private Task SaveRoom() => Run(async () =>
+    {
+        var input = new RoomInput(Guid.Parse(officeId), roomName, roomX, roomY, width, height);
+        var id = roomId == "" ? await Api.Post<Guid>("api/admin/rooms", input) : await Api.Put<Guid>($"api/admin/rooms/{roomId}", input);
+        map = await Api.Get<OfficeMap>($"api/offices/{officeId}/map?archived=true"); roomId = id.ToString(); SelectRoom(); Notice = "Room saved.";
+    });
+    private Task SaveDesk() => Run(async () =>
+    {
+        var input = new DeskInput(Guid.Parse(roomId), label, deskX, deskY, rotation);
+        var id = deskId == "" ? await Api.Post<Guid>("api/admin/desks", input) : await Api.Put<Guid>($"api/admin/desks/{deskId}", input);
+        map = await Api.Get<OfficeMap>($"api/offices/{officeId}/map?archived=true"); deskId = id.ToString(); SelectDesk(); Notice = "Desk saved.";
+    });
+    private Task Archive(string resource, Guid id) => Run(async () =>
+    {
+        await Api.Action($"api/admin/{resource}/{id}/archive"); await Reload(); await LoadOffice(); Notice = "Archived. History has been preserved and active reservations have been resolved.";
+    });
+}

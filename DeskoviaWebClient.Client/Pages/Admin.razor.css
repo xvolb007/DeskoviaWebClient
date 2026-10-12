@@ -1,0 +1,204 @@
+﻿.layout-editor {
+    display: grid;
+    gap: 1.25rem;
+}
+
+.editor-row {
+    display: grid;
+    grid-template-columns: minmax(250px, 300px) minmax(0, 1fr);
+    gap: 1rem;
+    align-items: start;
+}
+
+.editor-form,
+.editor-preview {
+    min-width: 0;
+    margin: 0;
+}
+
+.editor-form {
+    --editor-label-width: 5.2rem;
+    display: grid;
+    gap: .65rem;
+    padding: 1rem;
+}
+
+.editor-heading,
+.preview-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .6rem;
+}
+
+.editor-heading h2,
+.preview-heading h2 {
+    margin: 0;
+}
+
+.editor-field {
+    display: grid;
+    grid-template-columns: var(--editor-label-width) minmax(0, 1fr);
+    gap: .5rem;
+    align-items: center;
+    margin: 0;
+    font-size: .85rem;
+}
+
+.editor-field input,
+.editor-field select {
+    width: 100%;
+    min-width: 0;
+    padding: .35rem .45rem;
+    font-size: .85rem;
+}
+
+.editor-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem;
+    margin-top: .25rem;
+}
+
+.editor-actions button {
+    margin: 0;
+    padding: .4rem .65rem;
+    font-size: .85rem;
+}
+
+.draft-badge,
+.preview-badge {
+    flex-shrink: 0;
+    border-radius: 1rem;
+    padding: .15rem .55rem;
+    background: #e3f2ee;
+    color: #176d65;
+    font-size: .75rem;
+}
+
+.editor-preview {
+    padding: 1rem;
+}
+
+.preview-summary {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: .4rem 1rem;
+    margin: .75rem 0;
+    color: #536776;
+    font-size: .85rem;
+}
+
+.preview-summary strong {
+    color: var(--ink);
+    overflow-wrap: anywhere;
+}
+
+.preview-frame {
+    overflow: hidden;
+    border: 1px solid #bacdce;
+    border-radius: .5rem;
+    background: #f7faf9;
+}
+
+.layout-canvas {
+    display: block;
+    width: 100%;
+    height: 350px;
+}
+
+.canvas-grid {
+    fill: none;
+    stroke: #dce7e5;
+    stroke-width: .7;
+    vector-effect: non-scaling-stroke;
+}
+
+.saved-room rect,
+.saved-desk rect {
+    fill: #dceee9;
+    stroke: #548d89;
+    stroke-width: 1.5;
+    vector-effect: non-scaling-stroke;
+}
+
+.saved-room text,
+.saved-desk text {
+    fill: #203445;
+    pointer-events: none;
+}
+
+.draft-room rect {
+    fill: #176d6526;
+    stroke: #176d65;
+    stroke-width: 2.5;
+    stroke-dasharray: 6 3;
+    vector-effect: non-scaling-stroke;
+}
+
+.draft-room text,
+.draft-room circle {
+    fill: #176d65;
+}
+
+.draft-desk rect {
+    fill: #176d65;
+    stroke: #e2a626;
+    stroke-width: 2.5;
+    vector-effect: non-scaling-stroke;
+}
+
+.draft-desk text {
+    fill: #fff;
+    pointer-events: none;
+}
+
+.room-boundary {
+    stroke: #809f9b;
+    stroke-width: 2;
+    vector-effect: non-scaling-stroke;
+}
+
+.coordinate-guides line {
+    stroke: #c78c24;
+    stroke-width: 1.5;
+    stroke-dasharray: 4 3;
+    vector-effect: non-scaling-stroke;
+}
+
+.coordinate-guides circle,
+.coordinate-guides text {
+    fill: #956315;
+}
+
+.canvas-choice {
+    cursor: pointer;
+}
+
+.canvas-choice:hover rect,
+.canvas-choice:focus-visible rect {
+    stroke: #b78318;
+    stroke-width: 3;
+}
+
+.canvas-choice:focus-visible {
+    outline: none;
+}
+
+.preview-help {
+    margin: .7rem 0 0;
+    font-size: .8rem;
+    color: #536776;
+    line-height: 1.5;
+}
+
+@media (max-width: 850px) {
+    .editor-row {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .layout-canvas {
+        height: 300px;
+    }
+}

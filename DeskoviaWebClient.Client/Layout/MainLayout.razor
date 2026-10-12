@@ -1,23 +1,38 @@
 ﻿@inherits LayoutComponentBase
+@inject DeskoviaWebClient.Client.Services.ApiClient Api
+@implements IDisposable
 
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
-
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
-        </div>
-
-        <article class="content px-4">
-            @Body
-        </article>
-    </main>
+<div class="workspace">
+    <header>
+        <a class="brand" href="/">Deskovia <small>ABC</small></a>
+        <nav aria-label="Main navigation">
+            <NavLink href="/" Match="NavLinkMatch.All">Offices</NavLink>
+            <NavLink href="/reservations">My reservations</NavLink>
+            @if (Api.Admin) { <NavLink href="/admin">Offices and layout</NavLink><NavLink href="/closures">Closures</NavLink><NavLink href="/members">Members</NavLink><NavLink href="/admin/history">ABC history</NavLink> }
+            @if (Api.Owner) { <NavLink href="/owner">Demo and billing</NavLink> }
+        </nav>
+        @if (Api.User != null)
+        {
+            <span>@Api.User.Name · @Api.User.Role</span>
+            <button disabled="@loggingOut" @onclick="Logout">Sign out</button>
+        }
+        else { <a href="/login">Sign in</a> }
+    </header>
+    @if (logoutError != null) { <p role="alert" class="error">@logoutError</p> }
+    <main>@Body</main>
+    <footer>Shared workspaces at ABC · dates and times use the office time zone</footer>
 </div>
-
-<div id="blazor-error-ui" data-nosnippet>
-    An unhandled error has occurred.
-    <a href="." class="reload">Reload</a>
-    <span class="dismiss">🗙</span>
-</div>
+<div id="blazor-error-ui" data-nosnippet>Application error. <a href=".">Reload</a></div>
+@code {
+    private bool loggingOut;
+    private string? logoutError;
+    protected override void OnInitialized() => Api.Changed += Refresh;
+    private void Refresh() => InvokeAsync(StateHasChanged);
+    private async Task Logout()
+    {
+        loggingOut = true; logoutError = null;
+        try { await Api.Logout(); } catch (Exception e) { logoutError = e.Message; }
+        finally { loggingOut = false; }
+    }
+    public void Dispose() => Api.Changed -= Refresh;
+}

@@ -1,0 +1,88 @@
+﻿@page "/login"
+@page "/register"
+@inherits WorkspacePage
+@inject NavigationManager Navigation
+
+<PageTitle>Sign in — Deskovia</PageTitle>
+<h1>@(Register ? "Register with ABC" : "Sign in to Deskovia")</h1>
+<Feedback Busy="@(Busy || loading)" Error="@Error" Notice="@Notice" />
+@if (!loaded && !loading)
+{
+    <button @onclick="LoadOptions">Retry</button>
+}
+@if (loaded)
+{
+    @if (settings?.MicrosoftEnabled == true)
+    {
+        <section class="panel auth">
+            <h2>Microsoft Entra ID</h2>
+            <p>Sign in with your university Microsoft account. Your first successful Microsoft sign-in creates an account in ABC.</p>
+            @if (settings.MicrosoftConfigured)
+            {
+                <form method="post" action="@Api.MicrosoftLoginUrl" data-enhance="false">
+                    <input type="hidden" name="__RequestVerificationToken" value="@csrf" />
+                    <input type="hidden" name="returnUrl" value="@(ReturnUrl ?? "/")" />
+                    <button type="submit" class="primary" disabled="@Busy">Sign in with Microsoft</button>
+                </form>
+            }
+            else
+            {
+                <p role="alert">Microsoft sign-in is not configured. Set Entra:ClientSecret in the backend's local User Secrets and restart the API.</p>
+            }
+        </section>
+    }
+    <form class="panel auth" @onsubmit="Submit" @onsubmit:preventDefault>
+        <h2>@(Register ? "Local account" : "Sign in with a local password")</h2>
+        <fieldset disabled="@Busy">
+            @if (Register) { <label>Name <input @bind="name" required maxlength="100" autocomplete="name" /></label> }
+            <label>Email <input type="email" @bind="email" required maxlength="320" autocomplete="username" /></label>
+            <label>Password <input type="password" @bind="password" required minlength="12" maxlength="128" autocomplete="@(Register ? "new-password" : "current-password")" /></label>
+            @if (Register)
+            {
+                <label>Confirm password <input type="password" @bind="repeat" required minlength="12" maxlength="128" autocomplete="new-password" /></label>
+                <p>The first account in ABC becomes Owner. All later accounts are Employees.</p>
+            }
+            <button type="submit">@(Register ? "Create local account" : "Sign in with password")</button>
+        </fieldset>
+    </form>
+    <p><a href="@(Register ? "/login" : "/register")">@(Register ? "Already have an account?" : "Register a local account")</a></p>
+}
+@code {
+    [SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
+    [SupplyParameterFromQuery] public string? AuthError { get; set; }
+    private string name = "", email = "", password = "", repeat = "", csrf = "";
+    private bool loading = true, loaded;
+    private SignInOptions? settings;
+    private bool Register => Navigation.ToBaseRelativePath(Navigation.Uri).StartsWith("register");
+    protected override Task OnInitializedAsync() => LoadOptions();
+    private async Task LoadOptions()
+    {
+        loading = true; Error = null;
+        try
+        {
+            settings = await Api.Get<SignInOptions>("api/auth/options");
+            await Api.RefreshSession();
+            csrf = await Api.FormSecurityToken();
+            loaded = true;
+            Error = AuthError switch
+            {
+                null => null,
+                "email_exists" => "An account with this email already exists. Use its existing sign-in method.",
+                "account_unavailable" => "This account is disabled or unavailable. Contact the Owner.",
+                "microsoft_not_configured" => "Microsoft sign-in is not configured. Check the backend's Entra settings.",
+                "microsoft_email_unavailable" => "Microsoft did not provide an email address. Contact the Owner.",
+                _ => "Microsoft sign-in could not be completed. Retry; check the tenant, Web redirect URI, client secret and university consent policy if the problem persists."
+            };
+        }
+        catch (ApiException e) { Error = e.Message; }
+        finally { loading = false; }
+    }
+    private Task Submit() => Run(async () =>
+    {
+        if (Register && password != repeat) { Error = "Passwords do not match."; return; }
+        await Api.Authenticate(Register, name, email, password);
+        password = repeat = "";
+        var safe = ReturnUrl != null && ReturnUrl.StartsWith('/') && !ReturnUrl.StartsWith("//") && !ReturnUrl.Contains((char)92) && !ReturnUrl.Any(char.IsControl);
+        Navigation.NavigateTo(safe ? ReturnUrl! : "/");
+    });
+}

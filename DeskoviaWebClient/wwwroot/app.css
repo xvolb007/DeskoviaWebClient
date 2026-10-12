@@ -1,4 +1,4 @@
-html, body {
+﻿html, body {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
 
@@ -58,3 +58,82 @@ h1:focus {
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
     text-align: start;
 }
+
+/* Deskovia workspace */
+:root { --ink: #203445; --accent: #176d65; --paper: #f3f6f7; }
+body { background: var(--paper); color: var(--ink); margin: 0; }
+.workspace header { background: #fff; border-bottom: 1px solid #d9e3e6; padding: 1rem 2rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+.brand { color: var(--accent); font-size: 1.5rem; font-weight: 700; text-decoration: none; }
+.brand small { font-size: .7rem; }
+nav { display: flex; gap: 1rem; flex-wrap: wrap; flex: 1; }
+nav a { color: var(--ink); text-decoration: none; }
+nav a.active { color: var(--accent); border-bottom: 2px solid var(--accent); }
+.workspace main { max-width: 1240px; margin: 2rem auto; padding: 0 1.2rem; }
+.workspace footer { text-align: center; padding: 2rem; color: #536776; }
+h1 { font-size: 1.9rem; margin-bottom: 1.5rem; }
+h2 { font-size: 1.3rem; } h3 { font-size: 1.1rem; }
+fieldset { border: 0; padding: 0; }
+label { display: inline-flex; flex-direction: column; gap: .35rem; margin: .5rem .7rem .7rem 0; }
+input, select { border: 1px solid #9fb3be; border-radius: .35rem; padding: .55rem; background: #fff; max-width: 100%; }
+input[type=checkbox] { margin-right: .3rem; }
+button { border: 1px solid #94aaa8; background: #fff; border-radius: .35rem; color: var(--ink); padding: .5rem .85rem; margin: .25rem; }
+button.primary, button.selected { background: var(--accent); color: #fff; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #f6b648; outline-offset: 2px; }
+.panel { background: #fff; border: 1px solid #dae4e6; border-radius: .7rem; padding: 1.25rem; margin: 1rem 0; }
+.auth { max-width: 460px; } .auth label { display: flex; }
+.toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: .75rem 1rem;
+    margin: .5rem 0 .75rem;
+}
+.toolbar > label {
+    display: flex;
+    flex-direction: column;
+    gap: .35rem;
+    margin: 0;
+    min-width: 0;
+}
+.toolbar > label > input:not([type=checkbox]),
+.toolbar > label > select,
+.toolbar > input:not([type=checkbox]),
+.toolbar > select,
+.toolbar > button {
+    box-sizing: border-box;
+    height: 2.75rem;
+    margin: 0;
+}
+.toolbar > label > select {
+    min-width: 10rem;
+}
+.toolbar > span,
+.toolbar > label:has(> input[type=checkbox]) {
+    display: flex;
+    align-items: center;
+    min-height: 2.75rem;
+    margin: 0;
+}
+.toolbar > label:has(> input[type=checkbox]) {
+    flex-direction: row;
+}
+.room-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; }
+.room-map { position: relative; width: 100%; min-height: 150px; max-height: 600px; border: 2px solid #bacdce; background: repeating-linear-gradient(0deg, transparent 0 24px, #edf3f3 24px 25px), repeating-linear-gradient(90deg, #f9fbfb 0 24px, #edf3f3 24px 25px); }
+.desk { position: absolute; display: flex; align-items: center; justify-content: center; margin: 0; padding: 0; border: 1px solid #548d89; background: #dceee9; font-size: .8rem; overflow: hidden; border-radius: 20%; }
+.desk.occupied { background: #f9dec5; border-color: #b27645; }
+.desk.selected { background: #176d65; color: white; outline: 3px solid #f6b648; }
+.map-help { margin: .75rem 0 0; font-size: .9rem; color: #536776; }
+.desk-occupancy { margin-top: 1rem; }
+.desk-occupancy p { margin: .4rem 0; }
+.calendar { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }
+.calendar button { min-height: 75px; } .calendar small { display: block; font-size: .7rem; }
+.error { background: #fff0ed; color: #842d21; padding: 1rem; border-left: 4px solid #b04a39; white-space: pre-wrap; }
+.success { background: #e2f3e7; color: #225a39; padding: 1rem; }
+.status { color: #406573; }
+.reservation small { display: block; margin-top: .7rem; }
+.mail { white-space: pre-wrap; overflow-wrap: anywhere; }
+.office-plan { position: relative; height: 450px; overflow: auto; background: #edf3f3; border: 1px solid #bacdce; }
+.office-plan button { position: absolute; background: #dceee9; margin: 0; }
+#blazor-error-ui { display: none; position: fixed; bottom: 0; width: 100%; background: #fff0ed; padding: 1rem; }
+@media (max-width: 600px) { .workspace header { padding: 1rem; } nav { flex-basis: 100%; } .workspace main { margin-top: 1rem; } .room-grid { display: block; } }

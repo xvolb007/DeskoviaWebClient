@@ -1,0 +1,22 @@
+﻿<div class="slider-field">
+    <label for="@Id">@Label</label>
+    <div class="slider-controls">
+        <input id="@Id" type="number" min="@Invariant(Min)" max="@Invariant(Max)" step="@Invariant(Step)"
+               @bind:get="Value" @bind:set="UpdateValue" @bind:event="oninput" />
+        <input type="range" min="@Invariant(Min)" max="@Invariant(Max)" step="@Invariant(Step)"
+               aria-label="@($"{Label} slider")" @bind:get="Value" @bind:set="UpdateValue" @bind:event="oninput" />
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Id { get; set; } = "";
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter] public decimal Value { get; set; }
+    [Parameter] public EventCallback<decimal> ValueChanged { get; set; }
+    [Parameter] public decimal Min { get; set; }
+    [Parameter] public decimal Max { get; set; }
+    [Parameter] public decimal Step { get; set; } = 1;
+
+    private Task UpdateValue(decimal value) => ValueChanged.InvokeAsync(value);
+    private static string Invariant(decimal value) => value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+}

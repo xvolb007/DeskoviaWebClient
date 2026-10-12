@@ -1,0 +1,41 @@
+﻿@page "/members"
+@inherits WorkspacePage
+
+<PageTitle>Members — Deskovia</PageTitle>
+<h1>ABC members</h1>
+<Feedback Busy="Busy" Error="@Error" Notice="@Notice" />
+@if (Api.Admin)
+{
+<fieldset disabled="@Busy">
+    <button @onclick="Refresh">Refresh</button>
+    @if (members.Count == 0) { <p>No members.</p> }
+    @foreach (var m in members)
+    {
+        <article class="panel"><h2>@m.Name</h2><p>@m.Email · @m.Role · @(m.Active ? "Active" : "Disabled")</p>
+        <div class="toolbar">
+            @if (m.Role != "Owner" && (Api.Owner || m.Role == "Employee"))
+            {
+                <button @onclick="() => Enable(m.Id, !m.Active)">@(m.Active ? "Disable and resolve reservations" : "Enable without restoring reservations")</button>
+            }
+            @if (Api.Owner && m.Role != "Owner")
+            {
+                <button @onclick='() => Role(m.Id, m.Role == "Employee" ? "Administrator" : "Employee")'>@(m.Role == "Employee" ? "Promote to Administrator" : "Remove Administrator role")</button>
+                <label>Demo directory <select value="@(m.DirectoryState ?? "")" @onchange="e => Directory(m.Id, e.Value?.ToString())">
+                    <option value="">Not connected</option><option>Active</option><option>Disabled</option><option>Deleted</option><option>Unavailable</option>
+                </select></label>
+            }
+        </div>
+        </article>
+    }
+</fieldset>
+}
+@code {
+    private List<MemberView> members = [];
+    protected override Task OnInitializedAsync() => Run(async () => { if (await Api.Ensure()) await Load(); });
+    protected override Task OnConflict() => Load();
+    private async Task Load() => members = await Api.Get<List<MemberView>>("api/admin/members");
+    private Task Refresh() => Run(Load);
+    private Task Enable(Guid id, bool enable) => Run(async () => { await Api.Action($"api/admin/members/{id}/{(enable ? "enable" : "disable")}"); await Load(); Notice = "Member status updated."; });
+    private Task Role(Guid id, string role) => Run(async () => { await Api.Action($"api/owner/members/{id}/role", new RoleRequest(role), "PUT"); await Load(); Notice = "Role updated."; });
+    private Task Directory(Guid id, string? state) => Run(async () => { await Api.Action($"api/owner/demo-directory/{id}", new DirectoryRequest(string.IsNullOrEmpty(state) ? null : state), "PUT"); await Load(); Notice = "Demo directory record updated."; });
+}

@@ -1,7 +1,163 @@
 ﻿@page "/"
+@inherits WorkspacePage
 
-<PageTitle>Home</PageTitle>
-
-<h1>Hello, world!</h1>
-
-Welcome to your new app.
+<PageTitle>Workspaces — Deskovia</PageTitle>
+<h1>Choose a workspace</h1>
+<Feedback Busy="Busy" Error="@Error" Notice="@Notice" />
+<fieldset disabled="@Busy">
+    <div class="toolbar">
+        <label>Office <select @bind="officeId" @bind:after="OfficeChanged"><option value="">Select an office</option>@foreach (var o in offices) { <option value="@o.Id">@o.Name</option> }</select></label>
+        @if (office != null)
+        {
+            <label>Room <select @bind="roomId" @bind:after="RoomChanged" disabled="@(map.Rooms.Count == 0)"><option value="">Select a room</option>@foreach (var r in map.Rooms) { <option value="@r.Id">@r.Name</option> }</select></label>
+            <label>Map date <input type="date" @bind="mapDate" @bind:after="LoadOccupancy" min="@office.Today.ToString("yyyy-MM-dd")" max="@office.Today.AddDays(office.BookingHorizonDays).ToString("yyyy-MM-dd")" /></label>
+        }
+    </div>
+    @if (office != null)
+    {
+        <p>@office.TimeZoneId · booking horizon: @office.BookingHorizonDays days</p>
+        <p>Working hours: @string.Join("; ", office.Hours.OrderBy(x => x.Day).Select(x => $"{x.Day}: {x.OpensAt:HH:mm}–{x.ClosesAt:HH:mm}"))</p>
+        @if (map.Rooms.Count == 0) { <p>No active rooms are available yet. Contact an administrator.</p> }
+        else if (roomId == "") { <p>Select a room to view its map and choose a desk.</p> }
+        <div class="room-grid">
+        @foreach (var r in map.Rooms.Where(x => x.Id.ToString() == roomId))
+        {
+            <section class="panel">
+                <h2>@r.Name</h2>
+                <div class="room-map" style="aspect-ratio:@Number(r.Width) / @Number(r.Height)">
+                    @foreach (var d in map.Desks.Where(x => x.RoomId == r.Id))
+                    {
+                        var occupied = occupancy.Where(x => x.DeskId == d.Id).ToList();
+                        <button title="@string.Join("; ", occupied.Select(x => $"{x.Name}: {Local(x.Start, office.TimeZoneId)}–{Local(x.End, office.TimeZoneId)}"))"
+                            aria-label="@($"Select desk {d.Label}")" aria-pressed="@(deskId == d.Id)"
+                            class="desk @(occupied.Count > 0 ? "occupied" : "") @(deskId == d.Id ? "selected" : "")"
+                            style="left:@Number(d.X / r.Width * 100)%;top:@Number(d.Y / r.Height * 100)%;width:@Number(12 / r.Width * 100)%;height:@Number(12 / r.Height * 100)%;transform:rotate(@Number(d.Rotation)deg)"
+                            @onclick="() => SelectDesk(d.Id)">@d.Label</button>
+                    }
+                </div>
+                @if (!map.Desks.Any(x => x.RoomId == r.Id))
+                {
+                    <p>No active desks are available in this room yet.</p>
+                }
+                else
+                {
+                    <p class="map-help">Select a desk on the map. Orange desks have reservations on the map date.</p>
+                }
+                @if (deskId != null)
+                {
+                    var bookings = occupancy.Where(x => x.DeskId == deskId).ToList();
+                    @if (bookings.Count > 0)
+                    {
+                        <div class="desk-occupancy">
+                            <h3>Reservations on @mapDate.ToString("dd MMM yyyy", System.Globalization.CultureInfo.InvariantCulture)</h3>
+                            @foreach (var booking in bookings)
+                            {
+                                <p>@booking.Name · @Local(booking.Start, office.TimeZoneId) — @Local(booking.End, office.TimeZoneId)</p>
+                            }
+                        </div>
+                    }
+                }
+            </section>
+        }
+        </div>
+        @if (deskId != null)
+        {
+            <section class="panel">
+                <h2>Reservation: @map.Desks.First(x => x.Id == deskId).Label</h2>
+                <label><input type="checkbox" @bind="fullDay" @bind:after="ReloadDates" /> Full working day</label>
+                @if (!fullDay)
+                {
+                    <label>Start <input type="time" step="900" @bind="start" @bind:after="ReloadDates" /></label>
+                    <label>End <input type="time" step="900" @bind="end" @bind:after="ReloadDates" /></label>
+                }
+                <p>Select individual dates (up to 31). Unavailable dates show the reason. Adjacent intervals are allowed.</p>
+                <div class="calendar">
+                @foreach (var d in availability)
+                {
+                    <button disabled="@(!d.Available)" title="@(d.Reason ?? (d.Start == null ? "" : Local(d.Start.Value, office.TimeZoneId) + "–" + Local(d.End!.Value, office.TimeZoneId)))"
+                        class="@(selected.Contains(d.Date) ? "selected" : "")" @onclick="() => Toggle(d.Date)">
+                        @d.Date.ToString("dd MMM", System.Globalization.CultureInfo.InvariantCulture)<small>@(d.Available ? "Available" : d.Reason)</small>
+                    </button>
+                }
+                </div>
+                <h3>Reservation summary</h3>
+                @if (selected.Count == 0) { <p>No dates selected.</p> }
+                @foreach (var d in availability.Where(x => selected.Contains(x.Date))) { <p>@Local(d.Start!.Value, office.TimeZoneId) — @Local(d.End!.Value, office.TimeZoneId)</p> }
+                <button class="primary" disabled="@(selected.Count == 0)" @onclick="Book">Book @selected.Count dates</button>
+            </section>
+        }
+    }
+    else if (offices.Count == 0 && !Busy) { <p>No active offices yet.</p> }
+</fieldset>
+@code {
+    private List<OfficeView> offices = [];
+    private OfficeView? office;
+    private string officeId = "", roomId = "";
+    private Guid? deskId;
+    private OfficeMap map = new([], []);
+    private DateOnly mapDate;
+    private List<Occupancy> occupancy = [];
+    private List<DateAvailability> availability = [];
+    private HashSet<DateOnly> selected = [];
+    private bool fullDay = true;
+    private TimeOnly start = new(9, 0), end = new(17, 0);
+    protected override Task OnInitializedAsync() => Run(async () => { if (await Api.Ensure()) offices = await Api.Get<List<OfficeView>>("api/offices"); });
+    private Task OfficeChanged() => Run(async () =>
+    {
+        office = offices.FirstOrDefault(x => x.Id.ToString() == officeId); roomId = ""; deskId = null; selected.Clear(); availability.Clear();
+        map = new([], []); occupancy.Clear();
+        if (office == null) return;
+        mapDate = office.Today; SetSuggestedHours(); map = await Api.Get<OfficeMap>($"api/offices/{office.Id}/map"); await Occupancy();
+    });
+    private void SetSuggestedHours()
+    {
+        if (office == null) return;
+        var hours = office.Hours.FirstOrDefault(x => x.Day == office.Today.DayOfWeek) ?? office.Hours.FirstOrDefault();
+        if (hours == null) return;
+        start = hours.OpensAt; end = hours.ClosesAt;
+        var local = TimeZoneInfo.ConvertTime(office.ServerNow, TimeZoneInfo.FindSystemTimeZoneById(office.TimeZoneId));
+        var localTime = TimeOnly.FromDateTime(local.DateTime);
+        if (hours.Day == office.Today.DayOfWeek && localTime >= hours.OpensAt && localTime < hours.ClosesAt)
+        {
+            var nextTicks = (localTime.Ticks / (15 * TimeSpan.TicksPerMinute) + 1) * 15 * TimeSpan.TicksPerMinute;
+            if (nextTicks < TimeSpan.TicksPerDay && hours.ClosesAt.Ticks - nextTicks >= 30 * TimeSpan.TicksPerMinute) start = new TimeOnly(nextTicks);
+        }
+    }
+    private Task Occupancy() => LoadOccupancyCore();
+    private async Task LoadOccupancyCore()
+    {
+        if (office != null) occupancy = await Api.Get<List<Occupancy>>($"api/offices/{office.Id}/availability?date={mapDate:yyyy-MM-dd}");
+    }
+    private Task LoadOccupancy() => Run(LoadOccupancyCore);
+    private Task RoomChanged() => Run(() =>
+    {
+        deskId = null;
+        selected.Clear();
+        availability.Clear();
+        return Task.CompletedTask;
+    });
+    private Task SelectDesk(Guid id) => Run(async () => { deskId = id; selected.Clear(); await Dates(); });
+    private Task ReloadDates() => Run(Dates);
+    private async Task Dates()
+    {
+        if (office == null || deskId == null) return;
+        availability.Clear();
+        var dates = Enumerable.Range(0, office.BookingHorizonDays + 1).Select(x => office.Today.AddDays(x)).ToList();
+        foreach (var chunk in dates.Chunk(31))
+            availability.AddRange(await Api.Post<List<DateAvailability>>("api/reservations/availability", new BookingRequest(deskId.Value, chunk.ToList(), fullDay, start, end)));
+        selected.RemoveWhere(x => !availability.Any(d => d.Date == x && d.Available));
+    }
+    private void Toggle(DateOnly date)
+    {
+        if (!selected.Remove(date)) { if (selected.Count >= 31) Error = "You can select up to 31 dates per booking."; else selected.Add(date); }
+    }
+    private Task Book() => Run(async () =>
+    {
+        try
+        {
+            await Api.Post<BookingBatchResult>("api/reservations/batch", new BookingRequest(deskId!.Value, selected.Order().ToList(), fullDay, start, end));
+            selected.Clear(); Notice = "All selected dates have been booked."; await Dates(); await Occupancy();
+        }
+        catch (ApiException e) when (e.Status == 409) { await Dates(); await Occupancy(); throw; }
+    });
+}
