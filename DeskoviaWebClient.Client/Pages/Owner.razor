@@ -1,27 +1,12 @@
 ﻿@page "/owner"
 @inherits WorkspacePage
 
-<PageTitle>Demo and billing — Deskovia</PageTitle>
+<PageTitle>Owner tools — Deskovia</PageTitle>
 <h1>Owner demonstration tools</h1>
 <Feedback Busy="Busy" Error="@Error" Notice="@Notice" />
 @if (Api.Owner)
 {
 <fieldset disabled="@Busy">
-    <section class="panel">
-        <h2>Local payment simulator</h2>
-        <p>No real charges, card details or trial period. This is a local demonstration and does not connect to a payment provider.</p>
-        @if (billing != null)
-        {
-            <p>Demo price: @billing.DemoPrice @billing.Currency / month · @billing.Adapter</p>
-            <p>Subscription enforcement: @(billing.Enabled ? "Enabled" : "Disabled by the Billing.Enabled setting") · @billing.Status</p>
-            <p>Paid period (UTC): @billing.PeriodStart — @billing.PeriodEnd</p>
-            <div class="toolbar">
-                <label>Operation key <input @bind="key" maxlength="100" /></label>
-                <button @onclick="NewKey">New key</button><button class="primary" @onclick="() => Pay(true)">Simulate success</button><button @onclick="() => Pay(false)">Simulate failure</button>
-            </div>
-            <p>Reusing the same key returns the original result without extending the subscription again.</p>
-        }
-    </section>
     <section class="panel">
         <h2>Daily demo directory check</h2>
         <p>Configure records on the Members page. Disabled/Deleted disable accounts; Unavailable leaves access unchanged. Local accounts without a demo record are not checked.</p>
@@ -38,23 +23,15 @@
 </fieldset>
 }
 @code {
-    private BillingView? billing;
     private DirectoryRunView? directory;
     private List<NotificationView> notifications = [];
-    private string key = Guid.NewGuid().ToString();
     protected override Task OnInitializedAsync() => Run(async () => { if (await Api.Ensure()) { if (!Api.Owner) { Error = "You do not have permission to perform this action."; return; } await Load(); } });
     protected override Task OnConflict() => Load();
     private async Task Load()
     {
-        billing = await Api.Get<BillingView>("api/owner/billing"); directory = await Api.Get<DirectoryRunView>("api/owner/demo-directory");
+        directory = await Api.Get<DirectoryRunView>("api/owner/demo-directory");
         notifications = await Api.Get<List<NotificationView>>("api/owner/notifications");
     }
     private Task Refresh() => Run(Load);
-    private void NewKey() => key = Guid.NewGuid().ToString();
-    private Task Pay(bool success) => Run(async () =>
-    {
-        var result = await Api.Post<PaymentView>("api/owner/billing/simulate", new PaymentRequest(key, success));
-        await Load(); Notice = $"Simulation: {result.Status}. No real charge was made.";
-    });
     private Task Sync() => Run(async () => { await Api.Action("api/owner/demo-directory/sync"); await Load(); Notice = "Check completed."; });
 }

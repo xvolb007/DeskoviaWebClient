@@ -17,7 +17,7 @@ Shared is referenced from the adjacent DeskoviaEngine repository. Keep both repo
 
 ## Screens
 
-Sign-in/registration, office/room/date selection, map with selectable desks, individual dates and hours, own reservations and history. Administrator/Owner additionally have office/schedule management, a compact layout editor with side-by-side Room/Desk forms and live maps, archiving, closure previews, members and organisation history. Owner can access the local payment simulator, demo directory and test mailbox.
+Sign-in/registration, office/room/date selection, map with selectable desks, individual dates and hours, own reservations and history. Administrator/Owner additionally have office/schedule management, a compact layout editor with side-by-side Room/Desk forms and live maps, archiving, closure previews, members and organisation history. Owner can access the demo directory and test mailbox.
 
 Maps and history display the selected office's times rather than the browser time zone. The backend rechecks permissions, time windows and conflicts. Forms provide loading, error and empty states and prevent duplicate submissions; reservation/closure conflicts refresh data after 409.
 
@@ -54,3 +54,5 @@ Choose Office, then Room from matching dropdowns; only the selected room's map i
 Shared toolbar rows place labels above fields and align dropdowns, dates, action buttons and text on the control row. The same layout applies to office administration, history filters/pagination, closures, member actions and billing. On narrower screens, rows wrap with their labels kept beside their own field.
 
 Manual verification after rebuilding the frontend: select an office and each room, verify only its desks appear, select a desk and booking dates then switch rooms (the selection must clear), and inspect selector/button rows at desktop and mobile widths. The frontend build and BOM/CRLF/spaces checks pass; authenticated visual/browser acceptance is not claimed by compilation alone.
+
+The application has no payment flow, subscription or booking paywall. The one-time project delivery price is managed outside Deskovia.

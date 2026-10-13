@@ -9,7 +9,7 @@
             <NavLink href="/" Match="NavLinkMatch.All">Offices</NavLink>
             <NavLink href="/reservations">My reservations</NavLink>
             @if (Api.Admin) { <NavLink href="/admin">Offices and layout</NavLink><NavLink href="/closures">Closures</NavLink><NavLink href="/members">Members</NavLink><NavLink href="/admin/history">ABC history</NavLink> }
-            @if (Api.Owner) { <NavLink href="/owner">Demo and billing</NavLink> }
+            @if (Api.Owner) { <NavLink href="/owner">Owner tools</NavLink> }
         </nav>
         @if (Api.User != null)
         {
